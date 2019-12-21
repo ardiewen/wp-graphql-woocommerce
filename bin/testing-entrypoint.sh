@@ -44,9 +44,9 @@ dockerize \
     -timeout 1m
 
 # Download c3 for testing.
-if [ ! -f "${PROJECT_DIR}/c3.php" ]; then
-    echo 'Downloading c3.php'
-    curl -L 'https://raw.github.com/Codeception/c3/2.0/c3.php' > "${PROJECT_DIR}/c3.php"
+if [ ! -f "$PROJECT_DIR/c3.php" ]; then
+    echo "Downloading Codeception's c3.php"
+    curl -L 'https://raw.github.com/Codeception/c3/2.0/c3.php' > "$PROJECT_DIR/c3.php"
 fi
 
 # Install dependencies
@@ -68,23 +68,34 @@ chmod 777 ${TESTS_OUTPUT}
 # Run tests
 run_tests ${SUITES}
 
-# Fix codecoverage permissions and clean coverage.xml
-if [ -f "${TESTS_OUTPUT}/coverage.xml" ] && [[ "$COVERAGE" == "1" ]]; then
-    echo 'Setting "coverage.xml" permissions'.
-    chmod 777 -R "$TESTS_OUTPUT"/coverage.xml
+# Remove c3.php
+if [ -f "$PROJECT_DIR/c3.php" ] && [ "$SKIP_TESTS_CLEANUP" != "1" ]; then
+    echo "Removing Codeception's c3.php"
+    rm -rf "$PROJECT_DIR/c3.php"
+fi
 
+# Clean coverage.xml and clean up PCOV configurations.
+if [ -f "${TESTS_OUTPUT}/coverage.xml" ] && [[ "$COVERAGE" == "1" ]]; then
     echo 'Cleaning coverage.xml for deployment'.
     pattern="$PROJECT_DIR/"
     sed -i "s~$pattern~~g" "$TESTS_OUTPUT"/coverage.xml
 
     # Remove pcov/clobber
-    if version_gt $PHP_VERSION 7.0 && [ ${SKIP_PCOV_CLOBBER_CLEANUP} != "true" ]; then
+    if version_gt $PHP_VERSION 7.0 && [ "$SKIP_TESTS_CLEANUP" != "1" ]; then
         echo 'Removing pcov/clobber.'
         vendor/bin/pcov unclobber
         COMPOSER_MEMORY_LIMIT=-1 composer remove --dev pcov/clobber
     fi
 fi
 
+# Set public test result files permissions.
+if [ -n "$(ls "$TESTS_OUTPUT")" ]; then
+    echo 'Setting result files permissions'.
+    chmod 777 -R "$TESTS_OUTPUT"/*
+fi
+
+
+# Check results and exit accordingly.
 if [ -f "${TESTS_OUTPUT}/failed" ]; then
     echo "Uh oh, some went wrong."
     exit 1

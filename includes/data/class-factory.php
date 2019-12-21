@@ -29,6 +29,7 @@ use WPGraphQL\WooCommerce\Data\Connection\Cart_Item_Connection_Resolver;
 use WPGraphQL\WooCommerce\Data\Connection\Payment_Gateway_Connection_Resolver;
 use WPGraphQL\WooCommerce\Model\Order_Item;
 use WPGraphQL\WooCommerce\Model\Product;
+use WPGraphQL\WooCommerce\Model\Customer;
 use WPGraphQL\WooCommerce\Model\Tax_Rate;
 use WPGraphQL\WooCommerce\Model\Shipping_Method;
 
@@ -36,6 +37,16 @@ use WPGraphQL\WooCommerce\Model\Shipping_Method;
  * Class Factory
  */
 class Factory {
+	/**
+	 * Returns the current woocommerce customer object tied to the current session.
+	 *
+	 * @return Customer
+	 * @access public
+	 */
+	public static function resolve_session_customer() {
+		return new Customer();
+	}
+
 	/**
 	 * Returns the Customer store object for the provided user ID
 	 *
@@ -51,7 +62,7 @@ class Factory {
 		}
 		$customer_id = absint( $id );
 		$loader      = $context->getLoader( 'wc_customer' );
-		$loader->buffer( [ $customer_id ] );
+		$loader->buffer( array( $customer_id ) );
 		return new Deferred(
 			function () use ( $loader, $customer_id ) {
 				return $loader->load( $customer_id );
@@ -74,7 +85,7 @@ class Factory {
 		}
 		$object_id = absint( $id );
 		$loader    = $context->getLoader( 'wc_post_crud' );
-		$loader->buffer( [ $object_id ] );
+		$loader->buffer( array( $object_id ) );
 		return new Deferred(
 			function () use ( $loader, $object_id ) {
 				return $loader->load( $object_id );
@@ -167,6 +178,21 @@ class Factory {
 	}
 
 	/**
+	 * Resolves woocommerce cart.
+	 *
+	 * @return \WC_Cart
+	 */
+	public static function resolve_cart() {
+		do_action( 'woocommerce_before_calculate_totals', \WC()->cart );
+
+		new \WC_Cart_Totals( \WC()->cart );
+
+		do_action( 'woocommerce_after_calculate_totals', \WC()->cart );
+
+		return \WC()->cart;
+	}
+
+	/**
 	 * Resolves a cart item by key.
 	 *
 	 * @param string $id cart item key.
@@ -174,9 +200,7 @@ class Factory {
 	 * @return object
 	 */
 	public static function resolve_cart_item( $id ) {
-		$item = WC()->cart->get_cart_item( $id );
-
-		return $item;
+		return self::resolve_cart()->get_cart_item( $id );
 	}
 
 	/**
@@ -187,10 +211,8 @@ class Factory {
 	 * @return object
 	 */
 	public static function resolve_cart_fee( $id ) {
-		$fees = WC()->cart->get_fees();
-
-		if ( ! empty( $fees[ $id ] ) ) {
-			return $fees[ $id ];
+		if ( ! empty( self::resolve_cart()->get_fees()[ $id ] ) ) {
+			return self::resolve_cart()->get_fees()[ $id ];
 		}
 
 		return null;
